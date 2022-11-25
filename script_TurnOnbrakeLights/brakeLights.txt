@@ -1,0 +1,55 @@
+-- Register the behaviour
+behaviour("brakeLights")
+
+function brakeLights:Start()
+	-- Run when behaviour is created
+	self.vehicle = self.targets.vehicleTarget.gameObject.getComponent(Vehicle)
+	self.rearLights = self.transform.parent.gameObject.getComponent(MeshRenderer).materials[12]
+	self.originalColor = self.rearLights.GetColor("_EmissionColor") -- returns original color in RGBA
+	--self.newColor = Color(0.454, 0.251, 0.251)
+	self.newColor = Color(0.533, 0.197, 0.197)
+	self.transitionColor = self.newColor
+	self.isBrakeColorActive = false
+	self.isChangingColor = false
+	self.timer = 0
+end
+
+function brakeLights:Update()
+	-- Run every frame
+	self.forwardInput = Input.GetKeyBindAxis(KeyBinds.Vertical) -- get whether player is pressing forward / backward.
+	if Player.actor.activeVehicle ~= nil then 
+		-- if the player is in a vehicle.. (seems redundant but necessary for next if statement)
+		if Player.actor.activeVehicle.gameObject.getComponent(Vehicle) == self.vehicle then
+			-- if the player is in *this* vehicle..
+			if self.forwardInput < 0 then
+				-- if player is pressing the backwards movement key..
+				if self.isBrakeColorActive == false then
+					self.isBrakeColorActive = true
+					self.rearLights.SetColor("_EmissionColor", self.newColor)
+				end	
+			else
+				-- if player is not pressing the backwards movement key..
+				if self.isBrakeColorActive == true then
+					self.isBrakeColorActive = false
+					self.isChangingColor = true -- toggle on color fade (color lerp) back to original color
+				end	
+			end	
+		end
+	end
+	if self.isChangingColor == true then
+		self:lerpColors() -- fade back to original material color
+	end
+end
+
+function brakeLights:lerpColors()
+	if self.timer <= 0.15 then -- for the duration of the timer, fade back to the original color
+		self.transitionColor = Color.Lerp(self.transitionColor, self.originalColor, Time.deltaTime * 8)
+		self.rearLights.SetColor("_EmissionColor", self.transitionColor)
+		self.timer = self.timer + Time.deltaTime
+	else -- when timer is finished, fully switch back to original color, reset variables.
+		self.timer = 0
+		self.isChangingColor = false
+		self.transitionColor = self.newColor
+		self.rearLights.SetColor("_EmissionColor", self.originalColor)
+	end
+end

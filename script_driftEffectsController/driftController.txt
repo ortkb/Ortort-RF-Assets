@@ -1,0 +1,215 @@
+-- Register the behaviour
+behaviour("driftController")
+
+function driftController:Start()
+	-- Run when behaviour is created
+	self.dataContainer = self.gameObject.GetComponent(DataContainer)
+	self.driftAudio = self.targets.audioSourceTarget.gameObject.getComponent(AudioSource)
+	self.vehicle = self.targets.vehicleTarget.gameObject.getComponent(Vehicle)
+	self.vehicleTransform = self.targets.vehicleTarget.gameObject.transform
+	self.trailsParent = self.targets.trailTarget.gameObject
+	self.trailsArray = self:getChildren(self.trailsParent)
+	self.effectsParent = self.targets.otherEffectsTarget.gameObject
+	self.effectsArray = self:getChildren(self.effectsParent)
+	self.driftMaxVolume = self.driftAudio.volume
+	self.isGrounded = false
+	self.groundHit = Physics.Raycast
+	self.groundRay = Ray
+	self.groundDetectRange = self.dataContainer.GetFloat("Ground Detect Range")
+	self.skidTrailsYOffset = self.dataContainer.GetFloat("Skid Trails Y Offset")
+	self.minLateralSkid = self.dataContainer.getFloat("Min Lateral Skid Velocity")
+	self.minHandbrakeSkid = self.dataContainer.getFloat("Min Handbrake Skid Velocity")
+	self.driftAudioGainRate = self.dataContainer.getFloat("Drift Audio Gain Rate")
+	self.driftAudioDecreaseRate = self.dataContainer.getFloat("Drift Audio Decrease Rate")
+	self.driftLingerDuration = self.dataContainer.getFloat("Drift Linger Duration")
+	self.driftLingerTimer = 0
+	self.playerJustLeftVehicle = true
+	self.driftAudioToggle = false
+	self.isDrifting = false
+
+	self:pauseParticles(self.trailsArray) -- set trails, audio and effects to not play on startup
+	self:pauseParticles(self.effectsArray)
+	self.driftAudio.volume = 0
+
+
+	-- DEBUGGING / TESTING -- 
+	
+	self.lineRendererForTesing = self.gameObject.GetComponent(LineRenderer) -- line renderer for seeing the ground detection range while testing
+	self.vehicleTag = (self.vehicle.name .. " >> driftController - ") -- tag used to identify which script is currently being printed, from which gameobject
+	-- print(self.vehicleTag .. "is running!")
+	if self.lineRendererForTesing ~= nil and self.lineRendererForTesing.enabled == true then
+		print(self.vehicleTag .. "line renderer is active, drawing ground detect range indicator")
+		self.lineRendererForTesing.setPosition(1, Vector3(0, self.groundDetectRange * -1, 0))
+	--else print(self.vehicleTag .. "Ground detection range indicator is inactive")
+	end
+end
+
+function driftController:Update()
+	if self.vehicle.playerIsInside == true then -- when player is inside this vehicle..
+		self.playerJustLeftVehicle = false
+		self.groundRay = Ray(self.transform.position, self.transform.up * -1) -- check if there's ground below within groundDetectRange distance
+		self.groundHit = Physics.Raycast(self.groundRay, self.groundDetectRange, RaycastTarget.projectileHit)
+		self:updateDriftVolume()
+		if self.groundHit ~= nil then
+			-- When on the ground..
+			self:onGroundToggleListener() -- check if the vehicle has just landed from the air
+			self:driftListener() -- check if the conditions to drift have been met
+			if self.isDrifting == true then
+				-- if both on the ground and drifting..
+				self:updateSkidTrailsPos() -- update Y position of skid trails to be above the ground
+			end
+		else 
+			-- If in the air.. 
+			self:inAirToggleListener()
+		end
+		if self.isDrifting == true then -- If drifting..
+			-- update drift linger duration
+			self:driftUpdate()
+		end
+	else 
+		if self.playerJustLeftVehicle == false then -- when player is not in the target vehicle, turn off particles for performance
+			-- if player was in vehicle last frame but has left this frame..
+			self.playerJustLeftVehicle = true
+			self:endDrift() -- shut down particle effects, reset variables
+			self.driftAudio.Stop()
+			-- I'll let bots have drift trails once someone makes a map bots can race on
+		end
+	end
+end
+
+function driftController:drawParticles(particleArray) -- play particle effects
+	for i = 1, #particleArray do 
+		particleArray[i].GetComponent(ParticleSystem).Play()
+	end
+end
+
+function driftController:pauseParticles(particleArray) -- Stop particle effects
+	for i = 1, #particleArray do
+		particleArray[i].GetComponent(ParticleSystem).Stop()
+	end
+end
+
+function driftController:driftListener() -- Checks whether the vehicle is drifting
+	local velocity = Player.actor.velocity
+	if self:getLateralSkidDrift(velocity) or -- if a either the conditions for a lateral skid drift
+	self:getHandbrakeDrift(velocity) then -- or a handbrake drift have been met..
+		-- start a drift!
+		self:setDrift()
+	end
+end
+
+function driftController:updateSkidTrailsPos() -- updates Y position of skid trails to be above the ground
+	local hitDistance = self.groundHit.distance
+	local localTransforms = self.trailsParent.transform.localPosition
+	local newTransforms = Vector3(localTransforms.x, (hitDistance * -1) + self.skidTrailsYOffset, localTransforms.z)
+	self.trailsParent.transform.localPosition = newTransforms
+end
+
+function driftController:onGroundToggleListener() -- Checks if vehicle has just landed from the air
+	if self.isGrounded == false then -- if vehicle was previously in the air..
+		self.isGrounded = true -- toggle on isGrounded 
+		if(self.driftLingerTimer > 0) then -- continue trails if the drift timer is still running.
+			self:drawParticles(self.trailsArray) --## firing off every frame?
+			self:drawParticles(self.effectsArray) 
+		end
+	end
+end
+
+function driftController:inAirToggleListener() -- Checks if vehicle has just gone into the air
+	if self.isGrounded == true then -- if vehicle was previously on the ground..
+		self.isGrounded = false -- toggle off isGrounded and pause trails.
+		self:pauseParticles(self.trailsArray)
+		self:pauseParticles(self.effectsArray) 
+	end
+end
+
+function driftController:driftUpdate() -- update / refresh linger duration of drift
+	if self.isDrifting then
+		if self.driftLingerTimer > 0 then
+			self.driftLingerTimer = self.driftLingerTimer - Time.deltaTime
+		else
+			-- end drift once timer hits 0
+			self:endDrift()
+		end
+	end
+end
+
+function driftController:getLateralSkidDrift(_velocity) -- return whether the vehicle's sideways velocity is higher than minLateralSkid
+	local lateralVelocity = Vector3.Dot(self.vehicleTransform.right, _velocity)
+	-- drifting due to sideways velocity
+	if Mathf.Abs(lateralVelocity) >= self.minLateralSkid and self.minLateralSkid > -1 then
+		return true
+	end
+	return false
+end
+
+function driftController:getHandbrakeDrift(_velocity) -- return whether player is braking while at a speed higher than minHandbrakeSkid
+	local forwardVelocity = Vector3.Dot(self.vehicleTransform.forward, _velocity)
+	-- drifting due to the user braking
+	local forwardInput = Input.GetKeyBindAxis(KeyBinds.Vertical)
+	if forwardInput < 0 and forwardVelocity >= self.minHandbrakeSkid and self.minHandbrakeSkid > -1 then
+		return true
+	end
+	return false
+end
+
+function driftController:setDrift() -- set a drift to start, and last for the duration of driftLingerDuration
+	if self.isDrifting == false then -- Only need to turn on the particles once
+		self:drawParticles(self.trailsArray)
+		self:drawParticles(self.effectsArray) 
+		self:playDriftAudio()
+	end
+	self.isDrifting = true
+	self.driftLingerTimer = self.driftLingerDuration
+end
+
+function driftController:endDrift() -- stop drift, reset variables and turn off particles
+	self.isDrifting = false
+	self.driftLingerTimer = 0
+	self:pauseParticles(self.trailsArray)
+	self:pauseParticles(self.effectsArray) 
+end
+
+function driftController:playDriftAudio()
+	self.driftAudio.Play()
+end
+
+function driftController:pauseDriftAudio()
+	self.driftAudio.Pause() 
+	--self.driftAudio.Stop() -- Play() and Stop() will play the audio clip from the beginning every time. Not a big deal, but noticeable.
+end
+
+function driftController:getChildren(parentGameObject) -- takes a gameobject and returns an array containing its child objects
+	local childCount = parentGameObject.transform.childCount -1
+	local children = {}
+	for i = 0, childCount do
+		table.insert(children, parentGameObject.transform.getChild(i).gameObject)
+	end
+	return children
+end
+
+function driftController:updateDriftVolume() -- Changes volume of drift depending on whether the vehicle is starting or finishing a drift
+	if self.isDrifting == true then
+		if self.driftAudio.volume <= self.driftMaxVolume - 0.01 then
+			self:increaseDriftVolume() -- increase drift volume
+		else
+			self.driftAudio.volume = self.driftMaxVolume
+		end
+	else 
+		if(self.driftAudio.volume > 0) then -- decrease drift volume
+			self:decreaseDriftVolume()
+			if self.driftAudio.volume <= 0.05 then -- If drift audio is quiet enough, stop the sfx
+				self.driftAudio.volume = 0
+				self:pauseDriftAudio()
+			end
+		end
+	end
+end
+
+function driftController:increaseDriftVolume() -- increments drift sfx volume
+	self.driftAudio.volume = Mathf.Lerp(self.driftAudio.volume, self.driftMaxVolume, self.driftAudioGainRate * Time.deltaTime)
+end
+
+function driftController:decreaseDriftVolume() -- decreased drift sfx volume
+	self.driftAudio.volume = Mathf.Lerp(self.driftAudio.volume, 0, self.driftAudioDecreaseRate * Time.deltaTime)
+end

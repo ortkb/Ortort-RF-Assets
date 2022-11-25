@@ -1,0 +1,73 @@
+-- Register the behaviour
+behaviour("headlightsToggle")
+
+-- make sure that performance is optimised - no loose variables
+
+
+function headlightsToggle:Start()
+	-- Run when behaviour is created
+	self.dataContainer = self.gameObject.GetComponent(DataContainer)
+	self.vehicle = self.targets.vehicleTarget.gameObject.getComponent(Vehicle)
+	self.lights = self.targets.lightsTarget.gameObject
+	self.anim =  self.gameObject.getComponent(Animator)
+	self.isKeyHeld = false
+	self.lightsToggle = false
+	self.anim.SetBool("headlightsToggleOn", false)
+	self.turningOnLights = self.lights.activeSelf
+	self.turnOnDelay = self.dataContainer.getFloat("turnOnDelay")
+	self.lightsOnOverride = false
+	self.timer = 0
+	if self.turningOnLights == true then
+		self.lightsOnOverride = true
+		self.anim.SetBool("headlightsToggleOn", true)
+		self:activateLights()
+		self.lightsOnOverride = false
+	end
+end
+
+function headlightsToggle:Update()
+	-- Run every frame
+	if self.turningOnLights == true then
+		self:activateLights() -- activate spotlights
+	end
+	if self.vehicle.playerIsInside == true then	
+		-- when player is inside..
+		if Input.getKeyDown(KeyCode.T) then
+			-- when key is pressed..
+			if self.isKeyHeld == false then
+				if self.lightsToggle == false then
+					-- if on idle OFF animation..
+					-- turn lights ON (idle ON)
+					self.anim.SetBool("headlightsToggleOn", true)
+					self.turningOnLights = true
+				elseif self.lightsToggle == true then
+					-- if on idle ON animation..
+					-- turn lights OFF (idle OFF)
+					self.anim.SetBool("headlightsToggleOn", false)
+					self.lightsToggle = false
+					self.turningOnLights = false
+					self.timer = 0
+					self.lights.setActive(false)
+					-- print("lights off") --##
+				end
+			end
+			self.isKeyHeld = true
+		end
+
+		if Input.getKeyUp(KeyCode.T) then
+			self.isKeyHeld = false
+		end
+	end
+end
+
+function headlightsToggle:activateLights() -- activate spotlights once timer is finished
+	if self.timer >= self.turnOnDelay or self.lightsOnOverride == true then
+		self.lightsToggle = true
+		self.turningOnLights = false
+		self.timer = 0
+		self.lights.setActive(true)
+		-- print("lights on!") --##
+	else
+		self.timer = self.timer + Time.deltaTime
+	end
+end
