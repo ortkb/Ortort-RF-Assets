@@ -17,8 +17,8 @@ end
 function brakeLights:Update()
 	-- Run every frame
 	self.forwardInput = Input.GetKeyBindAxis(KeyBinds.Vertical) -- get whether player is pressing forward / backward.
-	if Player.actor.activeVehicle ~= nil then 
-		-- if the player is in a vehicle.. (seems redundant but necessary for next if statement)
+	if Player.actor.isDriver then 
+		-- if the player is driving a vehicle..
 		if Player.actor.activeVehicle.gameObject.getComponent(Vehicle) == self.vehicle then
 			-- if the player is in *this* vehicle..
 			if self.forwardInput < 0 then
