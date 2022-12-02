@@ -4,7 +4,7 @@ behaviour("muteAudioSourceOnExitingVehicle")
 function muteAudioSourceOnExitingVehicle:Start()
 	-- Run when behaviour is created
 	self.vehicle = self.targets.vehicleTarget.gameObject.getComponent(Vehicle)
-	self.throttleAudio = self.transform.parent.gameObject.getComponent(AudioSource)
+	self.audioSrc = self.transform.parent.gameObject.getComponent(AudioSource)
 	self.playerWasInVehicle = false
 	self.toggleAudio = false
 end
@@ -20,11 +20,11 @@ function muteAudioSourceOnExitingVehicle:Update()
 		if self.playerWasInVehicle == true then
 			--but if player WAS in vehicle last frame..
 			self.playerWasInVehicle = false
-			if self.throttleAudio.isPlaying == true then
+			if self.audioSrc.isPlaying == true then
 				-- if audio is still playing..
 				-- turn audio off.
 				self.toggleAudio = false
-				self.throttleAudio.mute = true
+				self.audioSrc.mute = true
 			end
 		end
 	end
@@ -34,7 +34,7 @@ function muteAudioSourceOnExitingVehicle:Update()
 			-- if there's a driver..
 			-- turn volume back on (doesn't play the audio, just unmutes it)
 			self.toggleAudio = true 
-			self.throttleAudio.mute = false
+			self.audioSrc.mute = false
 		end
 	end
 end
