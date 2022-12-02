@@ -9,26 +9,12 @@ function muteAudioSourceOnExitingVehicle:Start()
 	self.toggleAudio = false
 end
 
--- for next update, check if there are any passengers left in the vehicle --
--- currently, I think the throttle audio stops when the player leaves, 
--- even if a bot immediately starts driving again? Maybe? --
-
--- no, check if the player was the driver when leaving the vehicle 
--- no need to mute if the bot was driving
-
 function muteAudioSourceOnExitingVehicle:Update()
 	-- Run every frame
+
 	if self.vehicle.playerIsInside == true then
 		if self.playerWasInVehicle == false then
 			self.playerWasInVehicle = true
-		end
-		if self.toggleAudio == false then
-			if self.vehicle.hasDriver then
-				-- if there's a driver..
-				-- turn volume back on
-				self.toggleAudio = true 
-				self.throttleAudio.mute = false
-			end
 		end
 	else -- if player is not in vehicle..
 		if self.playerWasInVehicle == true then
@@ -40,6 +26,15 @@ function muteAudioSourceOnExitingVehicle:Update()
 				self.toggleAudio = false
 				self.throttleAudio.mute = true
 			end
+		end
+	end
+	-- when the audio is considered muted..
+	if self.toggleAudio == false then
+		if self.vehicle.hasDriver then
+			-- if there's a driver..
+			-- turn volume back on (doesn't play the audio, just unmutes it)
+			self.toggleAudio = true 
+			self.throttleAudio.mute = false
 		end
 	end
 end
