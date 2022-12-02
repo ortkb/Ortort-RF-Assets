@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4292093149570006147}
   - component: {fileID: 2104770673664313003}
   m_Layer: 0
-  m_Name: killThrottleAudioOnExit
+  m_Name: muteAudioOnVehicleExit
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -43,7 +43,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f8ca71ca01d2fb4098cb42abc5eceb7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  source: {fileID: 4900000, guid: efe2d981eb16c6f408d06e551341ab0b, type: 3}
+  source: {fileID: 4900000, guid: 5f84a5ef2db41fb4bb4666cc657b632b, type: 3}
   behaviour: 
   targets:
   - name: vehicleTarget
