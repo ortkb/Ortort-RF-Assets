@@ -6,7 +6,7 @@ I'm fairly certain either something in the script or the particles are responsib
 (Configurable values found in the driftController > Data Container component)
 
 - 'Ground Detect Range' - Distance the drift controller checks below itself to see if there's any ground, to determine whether the vehicle is grounded (is the ground at least X number of meters below?). Default: 0.65
-    Activate the the line renderer component on the driftController to visually see this distance (when testing the vehicle - it won't show in the Unity preview).
+    Activate the the line renderer component on the driftController to visually see this distance (when testing the vehicle - it won't show in the in-Unity preview window).
 
 - 'Skid Trails Y Offset' - Offset to Y-axis position of the drift tyre trails. Used to adjust the placement of the trails upwards so they don't go underneath the ground. Default: 0.1
 
