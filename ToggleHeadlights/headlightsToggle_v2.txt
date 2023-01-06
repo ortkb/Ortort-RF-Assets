@@ -1,0 +1,108 @@
+-- Register the behaviour
+behaviour("headlightsToggle_v2")
+
+-- make sure that performance is optimised - no loose variables
+
+
+function headlightsToggle_v2:Start()
+	-- Run when behaviour is created
+	self.dataContainer = self.gameObject.GetComponent(DataContainer)
+	self.vehicle = self.targets.vehicleTarget.gameObject.getComponent(Vehicle)
+	self.lights = self.targets.lightsTarget.gameObject -- refers to the lights (or the parent object of the lights) to toggle on / off
+	self.isTimerRunning = self.lights.activeSelf -- toggled on while waiting for the timer to count down. (On game load, is set to the active state of the lights.)
+	self.turnOnDelay = self.dataContainer.getFloat("turnOnDelay") -- an (optional) delay before the lights are turned on. Use if the lights are only meant to turn on after an animation has played (e.g. pop-up lights)
+	self.toggleKey = self.dataContainer.getString("headlightsToggleKey")
+	self.timer = 0 -- counts down the turnOnDelay
+	self.lightsToggleState = false -- current state
+	self.lightsOnOverride = false -- boolean to turn on lights immediately, skipping the timer wait.
+	
+	if self.targets.animatorTarget ~= nil then
+		-- if an animator is assigned to this script..
+		self.anims = self.targets.animatorTarget.getComponent(Animator)
+	else
+		self.anims = nil
+	end
+
+	if self.targets.audioTarget ~= nil then
+		-- if an animator is assigned to this script..
+		print("loaded audio")
+		self.audioSrc = self.targets.audioTarget.getComponent(AudioSource)
+	else
+		self.audioSrc = nil
+	end
+
+	self:setAnimationToggle(false)
+	
+
+	
+	if self.isTimerRunning == true then
+		-- if the lights are set to active on load..
+		self.lightsOnOverride = true
+		self:activateLights()
+		-- manually turn on the lights, skip waiting for the timer.
+		self.lightsOnOverride = false
+	end
+	
+end
+
+function headlightsToggle_v2:Update()
+
+	-- Updates timer, turns on lights when timer is finished.
+	if self.isTimerRunning == true then
+		self:activateLights() -- activate spotlights
+	end
+	
+	-- Takes inputs to toggle animations and timer
+	if Input.getKeyDown(KeyCode.T) and self.vehicle.playerIsInside == true then
+		-- when key is pressed while the player is inside the vehicle..
+		if self.lightsToggleState == false then
+			-- if on idle OFF animation..
+			-- turn lights ON (idle ON)
+
+			self:setAnimationToggle(true)
+			self:playAudio()
+			self.isTimerRunning = true
+		elseif self.lightsToggleState == true then
+			-- if on idle ON animation..
+			-- turn lights OFF (idle OFF)
+
+			self:setAnimationToggle(false)
+			self:playAudio()
+			self.lightsToggleState = false
+			self.isTimerRunning = false
+			self.timer = 0
+			self.lights.setActive(false)
+			-- print("lights off") --##
+		end
+	end
+	
+end
+
+function headlightsToggle_v2:activateLights() -- activate spotlights once timer is finished
+	if self.timer >= self.turnOnDelay or self.lightsOnOverride == true then
+		self.lightsToggleState = true
+		self.isTimerRunning = false
+		self.timer = 0
+		self.lights.setActive(true)
+		-- print("lights on!") --##
+	else
+		self.timer = self.timer + Time.deltaTime
+	end
+end
+
+
+function headlightsToggle_v2:setAnimationToggle(toggleBool)
+	if self.targets.animatorTarget ~= nil and self.anims ~= nil then
+		-- if an animator has been assigned..
+		self.anims.SetBool("headlightsToggle", toggleBool)
+		-- toggle the headlights on / off animation
+	end
+end
+
+function headlightsToggle_v2:playAudio()
+	if self.targets.audioTarget ~= nil and self.audioSrc ~= nil then
+		-- if an audio source has been assigned..
+		self.audioSrc.PlayOneShot(self.audioSrc.clip)
+		-- play audio clip
+	end
+end
