@@ -25,7 +25,6 @@ function headlightsToggle_v2:Start()
 
 	if self.targets.audioTarget ~= nil then
 		-- if an animator is assigned to this script..
-		print("loaded audio")
 		self.audioSrc = self.targets.audioTarget.getComponent(AudioSource)
 	else
 		self.audioSrc = nil

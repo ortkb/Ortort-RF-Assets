@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 9200811205443329209}
   - component: {fileID: 6485343254452893774}
+  - component: {fileID: 3809196843850503957}
   m_Layer: 0
   m_Name: brakeLights
   m_TagString: Untagged
@@ -48,3 +49,41 @@ MonoBehaviour:
   targets:
   - name: vehicleTarget
     value: {fileID: 0}
+--- !u!114 &3809196843850503957
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3621333040279615902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a53a71c6a7b01e1449208c55b04f1aa8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bools: []
+  ints:
+  - id: Rear Lights Material Index
+    value: 12
+  floats:
+  - id: R
+    value: 0.533
+  - id: G
+    value: 0.197
+  - id: B
+    value: 0.197
+  - id: Color Fade Speed Multiplier
+    value: 8
+  strings: []
+  vectors: []
+  rotations: []
+  colors: []
+  gradients: []
+  textures: []
+  sprites: []
+  audioClips: []
+  materials: []
+  animationCurves: []
+  gameObjects: []
+  skins: []
+  weaponEntries: []

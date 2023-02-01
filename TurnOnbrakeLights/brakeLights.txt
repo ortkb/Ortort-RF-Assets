@@ -3,11 +3,13 @@ behaviour("brakeLights")
 
 function brakeLights:Start()
 	-- Run when behaviour is created
+	self.dataContainer = self.gameObject.GetComponent(DataContainer)
 	self.vehicle = self.targets.vehicleTarget.gameObject.getComponent(Vehicle)
-	self.rearLights = self.transform.parent.gameObject.getComponent(MeshRenderer).materials[12]
+	self.rearLights = self.transform.parent.gameObject.getComponent(MeshRenderer).materials[self.dataContainer.getInt("Rear Lights Material Index")]
 	self.originalColor = self.rearLights.GetColor("_EmissionColor") -- returns original color in RGBA
-	--self.newColor = Color(0.454, 0.251, 0.251)
-	self.newColor = Color(0.533, 0.197, 0.197)
+	-- self.newColor = Color(0.533, 0.197, 0.197)
+	self.newColor = Color(self.dataContainer.getFloat("R"), self.dataContainer.getFloat("G"), self.dataContainer.getFloat("B"))
+	self.lerpMagnitude = self.dataContainer.getFloat("Color Fade Speed Multiplier")
 	self.transitionColor = self.newColor
 	self.isBrakeColorActive = false
 	self.isChangingColor = false
@@ -43,7 +45,7 @@ end
 
 function brakeLights:lerpColors()
 	if self.timer <= 0.15 then -- for the duration of the timer, fade back to the original color
-		self.transitionColor = Color.Lerp(self.transitionColor, self.originalColor, Time.deltaTime * 8)
+		self.transitionColor = Color.Lerp(self.transitionColor, self.originalColor, Time.deltaTime * self.lerpMagnitude)
 		self.rearLights.SetColor("_EmissionColor", self.transitionColor)
 		self.timer = self.timer + Time.deltaTime
 	else -- when timer is finished, fully switch back to original color, reset variables.
