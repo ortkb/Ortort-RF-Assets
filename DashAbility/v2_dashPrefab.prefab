@@ -1,0 +1,238 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5150507357667626244
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5150507357667626251}
+  - component: {fileID: 1106043467255414654}
+  - component: {fileID: 4341616513333181475}
+  - component: {fileID: 7510514496288839461}
+  m_Layer: 0
+  m_Name: v2_dashPrefab
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5150507357667626251
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5150507357667626244}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 2, y: 2, z: 2}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1106043467255414654
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5150507357667626244}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f8ca71ca01d2fb4098cb42abc5eceb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  source: {fileID: 4900000, guid: 935885d05f727ae4e8818165d8c94fd0, type: 3}
+  behaviour: dashScript
+  targets:
+  - name: Weapon
+    value: {fileID: 0}
+  - name: AudioSrc
+    value: {fileID: 7510514496288839461}
+  - name: Optional_DashChargedVisualEffect
+    value: {fileID: 0}
+  - name: Optional_HitboxPositionGameObject
+    value: {fileID: 0}
+--- !u!114 &4341616513333181475
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5150507357667626244}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a53a71c6a7b01e1449208c55b04f1aa8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bools:
+  - id: Cooldown Reset on Kill
+    value: 1
+  - id: Activate Dash on Key / Mouse button release
+    value: 1
+  - id: Use Mouse Button to Dash
+    value: 1
+  - id: Use KeyCode to Dash
+    value: 0
+  - id: Use Weapon fire to Dash
+    value: 0
+  - id: Allow turning mid-dash?
+    value: 1
+  - id: Only Dash forwards?
+    value: 1
+  - id: Don't Damage Teammates
+    value: 0
+  ints:
+  - id: Dash Damage
+    value: 40
+  - id: Dash Balance Damage
+    value: 150
+  - id: Input Mouse Button
+    value: 1
+  - id: Enable dash while Sprinting
+    value: 1
+  - id: Enable dash while Aiming
+    value: 1
+  - id: Damage Reduction % while Dashing
+    value: 50
+  floats:
+  - id: Dash Duration
+    value: 0.3
+  - id: Dash Distance
+    value: 12
+  - id: Dash Cooldown
+    value: 3
+  - id: Vertical Movement Multiplier
+    value: 1
+  - id: Dash Hitbox Size
+    value: 1.5
+  - id: Dash Balance Break Knockback
+    value: 180
+  - id: Balance Break Knockback Vertical Multiplier
+    value: 1.8
+  - id: Momentum Decay
+    value: 4
+  - id: Momentum Decay Ground Multiplier
+    value: 5
+  - id: Dmg Reduction Extra Duration
+    value: 1
+  strings:
+  - id: Dash Keybind
+    value: Left Alt
+  vectors: []
+  rotations: []
+  colors: []
+  gradients: []
+  textures: []
+  sprites: []
+  audioClips:
+  - id: Dash Attack Hitsound
+    value: {fileID: 8300000, guid: 27ce16984996e5e4c8b91eecf89e1a7d, type: 3}
+  - id: Cooldown Finish Audio Cue
+    value: {fileID: 8300000, guid: 3263e5e4bb290d74585baf53bc8b020c, type: 3}
+  - id: Dash Sound
+    value: {fileID: 0}
+  materials: []
+  animationCurves: []
+  gameObjects: []
+  skins: []
+  weaponEntries: []
+--- !u!82 &7510514496288839461
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5150507357667626244}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 1
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 20
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4

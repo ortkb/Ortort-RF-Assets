@@ -1,0 +1,469 @@
+--[[ 
+
+Credit to EaglePancake for the code used in updateVelocity()
+
+]]
+
+behaviour("dashScript")
+
+function dashScript:Start()
+	-- Set up data container
+	self.dataContainer = self.gameObject.GetComponent(DataContainer)
+	
+	-- Configuration
+
+	-- Input Methods
+	self.dashKeycode = string.lower(self.dataContainer.GetString("Dash Keybind"))  -- Default:'KeyCode.LeftAlt' / "left alt"
+	self.clickAsInput = self.dataContainer.GetBool("Use Mouse Button to Dash") 
+	self.keyCodeAsInput = self.dataContainer.GetBool("Use KeyCode to Dash") 
+	self.weaponFireAsInput = self.dataContainer.GetBool("Use Weapon fire to Dash") 
+	self.dashMouseButton = self.dataContainer.GetInt("Input Mouse Button") -- Default: '1' (0 = leftClick, 1 = rightClick, 2 = middleClick)
+	self.isDashOnKeyUp = self.dataContainer.GetBool("Activate Dash on Key / Mouse button release") -- Default: true
+	self.enableWhileAiming = self.dataContainer.GetInt("Enable dash while Aiming") -- 1 (enable) / 0 (disable) / -1 (only enable while aiming)
+	self.enableWhileSprinting = self.dataContainer.GetInt("Enable dash while Sprinting") -- 1 (enable) / 0 (disable) / -1 (only enable while running)
+	
+	-- Movement
+	self.dashDurationConfig = self.dataContainer.GetFloat("Dash Duration")
+	self.dashCooldownConfig = self.dataContainer.GetFloat("Dash Cooldown")
+	self.dashDistance = self.dataContainer.GetFloat("Dash Distance")
+	self.verticalMultiplier = self.dataContainer.GetFloat("Vertical Movement Multiplier") 
+	self.momentumDecay = self.dataContainer.GetFloat("Momentum Decay")
+	self.groundMomentumDecay = self.dataContainer.GetFloat("Momentum Decay Ground Multiplier") 
+	
+	-- Dash Attack
+	self.dashDmg = self.dataContainer.GetInt("Dash Damage")
+	self.dashBalanceDmg = self.dataContainer.GetInt("Dash Balance Damage")
+	self.dashKnockbackForce = self.dataContainer.GetFloat("Dash Balance Break Knockback")
+	self.dashVerticalKnockbackForce = self.dataContainer.GetFloat("Balance Break Knockback Vertical Multiplier")
+	self.dashHitboxSize = self.dataContainer.GetFloat("Dash Hitbox Size") -- Default: 1.5
+	self.dontDamageTeammates = self.dataContainer.GetBool("Don't Damage Teammates")
+	
+	--Audio
+	self.sfx_hitSound = self.dataContainer.HasAudioClip("Dash Attack Hitsound") and self.dataContainer.GetAudioClip("Dash Attack Hitsound") or nil
+	self.sfx_cooldownCue = self.dataContainer.HasAudioClip("Cooldown Finish Audio Cue") and self.dataContainer.GetAudioClip("Cooldown Finish Audio Cue") or nil
+	self.sfx_dashSound = self.dataContainer.HasAudioClip("Dash Sound") and self.dataContainer.GetAudioClip("Dash Sound") or nil
+
+	-- Misc
+	self.cooldownResetOnKill = self.dataContainer.GetBool("Cooldown Reset on Kill")
+	self.damageReductionWhileDashing = self.dataContainer.GetInt("Damage Reduction % while Dashing")
+	self.damageReductionExtraDuration = self.dataContainer.GetFloat("Dmg Reduction Extra Duration")
+	self.allowChangeinDirection = self.dataContainer.GetBool("Allow turning mid-dash?")
+	self.onlyDashForwards = self.dataContainer.GetBool("Only Dash forwards?")
+
+	-----
+
+	self.canDash = true -- Can the user dash?
+	self.remainingDashDuration = 0
+	self.remainingDashCooldown = -1
+	self.dashSpeed = self:getDashSpeed(self.dashDurationConfig, self.dashDistance)
+
+	-- (Weapon Script) Weapon
+	self.weapon = self.targets.Weapon.gameObject.GetComponent(Weapon)
+	if self.weaponFireAsInput then
+		-- if weaponfire is input, then add an onFire listener
+		self.weapon.onFire.AddListener(self, "onFire")
+	end
+
+	-- (Optional) Damage Reduction while dashing
+	local damageReduction = true
+	
+	if damageReduction == true then
+		Player.actor.onTakeDamage.AddListener(self, "playerTakeDamage")
+	end
+	
+	-- (Optional) Hitbox reposition
+	if self.targets.Optional_HitboxPositionGameObject ~= nil then
+		-- self.hitboxPosition = self.targets.HitboxPositionGameObject.gameObject.transform.position -- Parent / Centre Position of hitbox. 
+		self.hitboxPosition = self.targets.Optional_HitboxPositionGameObject.gameObject -- Parent / Centre Position of hitbox. 
+	end
+	
+	-- (Optional) Cooldown Indicator Visual Effects (Particles / Trails)
+	if self.targets.Optional_DashChargedVisualEffect ~= nil then
+		self.vfx_dashCharged = self.targets.Optional_DashChargedVisualEffect.gameObject
+	end
+
+	-- (Optional) Audio Source
+	if self.targets.AudioSrc ~= nil then  
+		self.audioSrc = self.targets.AudioSrc
+	end
+
+	-- Set up onActorDiedInfo
+	if self.cooldownResetOnKill then
+		GameEvents.onActorDiedInfo.AddListener(self,"onActorDiedInfo")
+	end
+end
+
+function dashScript:Update()
+
+	-- Check for 3rd/1st person camera toggle (DEBUG ONLY)
+	-- self:thirdPersonToggleCheck()
+
+	-- Checks whether the player has released the 'dash' keybind
+	self:dashKeybindCheck()
+
+	-- Updates dash cooldown if cooldown is not 0
+	if(self.remainingDashCooldown >= 0) then
+		self:updateDashCooldown()
+	end
+
+end
+
+function dashScript:FixedUpdate()
+	-- The 'Dash' state - Moves player and updates dash duration if duration is not 0
+	if(self.remainingDashDuration > 0) then
+		self:updateMovement()
+		self:updateDashDuration()
+		self:activateHitbox()
+		Player.actor.balance = self.playerBalanceRecord -- Stops balance from running out mid-dash
+	end
+
+	-- Continue momentum after a dash ends.
+	if self.continueVelocity then
+		self:updateVelocity()
+	end
+
+end
+
+-- // // // Listeners // // // 
+
+
+function dashScript:OnDisable()
+	if self.remainingDashDuration ~= nil and self.remainingDashDuration > 0 then
+		
+		-- if mid-dash when unquipping the weapon, end the dash.
+		self:endDash()
+	end
+	
+	-- Take a record of when the weapon was holstered.
+	self.holsterGameTime = Time.time
+end
+
+function dashScript:OnEnable()
+
+	-- Stop any carryover velocity
+	self.continueVelocity = false
+
+	-- if dash cooldown > 0 when unholstering the weapon, reduce cooldown by how long has passed since last the weapon was holstered.
+
+	if self.holsterGameTime ~= nil and self.remainingDashCooldown ~= nil then -- nil check in place since OnEnable() can end up running before variables have been initialised.
+		local unholsteredDuration = Time.time - self.holsterGameTime
+		
+		self.remainingDashCooldown = self.remainingDashCooldown - unholsteredDuration
+		
+		-- can manually set canDash and cooldown = 0 here if you want to reset the cooldown on draw
+		self:updateDashCooldown()
+
+	end
+end
+
+function dashScript:onFire()
+	if self.weaponFireAsInput and self.canDash then
+		self:startDash()
+	end
+end
+
+function dashScript:onActorDiedInfo(actor, info, isSilentKill)
+	-- If the player has killed an actor, reset cooldown	
+	if self.cooldownResetOnKill and info.isPlayerSource then
+		self:resetCooldown()
+	end
+end
+
+function dashScript:playerTakeDamage(actor, source, damageInfo)
+	if damageInfo.isScripted == false and self.canReduceDamage then 
+		local newHealthDamage = damageInfo.healthDamage - ((damageInfo.healthDamage / 100) * self.damageReductionWhileDashing)
+		local newBalanceDamage = damageInfo.balanceDamage - ((damageInfo.balanceDamage / 100) * self.damageReductionWhileDashing)
+		print("<color=orange>v2_DashScript > playerTakeDamage:</color> Negated ".. self:truncate((damageInfo.healthDamage / 100) * self.damageReductionWhileDashing) .. " Damage. - Original damage = " .. self:truncate(damageInfo.healthDamage) .. ", New Damage = " .. self:truncate(newHealthDamage) )
+		Player.actor.Damage(source, newHealthDamage, newBalanceDamage, damageInfo.isSplashDamage, damageInfo.isPiercing, damageInfo.point, damageInfo.direction, damageInfo.impactForce)	
+		CurrentEvent.Consume()
+	end
+end
+
+-- // // // FUNCTIONS // // // 
+
+function dashScript:dashKeybindCheck()
+
+	-- stop player from dashing if they're using a vehicle, parachute or ladder
+	if Player.actor.isDriver or Player.actor.isPassenger or Player.actor.isOnLadder or Player.actor.isParachuteDeployed then
+		return
+	end
+	
+	-- KeyCode input
+	-- KeyUp
+	if self.keyCodeAsInput and self.isDashOnKeyUp then
+		if (self.dashKeycode ~= nil and Input.GetKeyUp(self.dashKeycode) and self.canDash) then
+			self:startDash()
+		end
+		-- KeyDown
+	elseif self.keyCodeAsInput and self.isDashOnKeyUp == false then
+		if (self.dashKeycode ~= nil and Input.GetKeyDown(self.dashKeycode) and self.canDash) then
+			self:startDash()
+		end
+	end
+
+	-- Mouse Button input
+	-- MouseUp
+	if self.clickAsInput and self.isDashOnKeyUp then
+		if (self.dashMouseButton ~= nil and Input.GetMouseButtonUp(self.dashMouseButton) and self.canDash) then
+			self:startDash()
+		end
+	-- MouseDown
+	elseif self.clickAsInput and self.isDashOnKeyUp == false then
+		if (self.dashMouseButton ~= nil and Input.GetMouseButtonDown(self.dashMouseButton) and self.canDash) then
+			self:startDash()
+		end
+	end
+end
+
+function dashScript:startDash()
+
+	-- if it's currently possible to dash..
+	if not ((self.enableWhileSprinting == 0 and Player.actor.isSprinting) or (self.enableWhileAiming == 0 and Player.actor.isAiming) or (self.enableWhileSprinting == -1 and Player.actor.isSprinting == false) or (self.enableWhileAiming == -1 and Player.actor.isAiming == false)) then
+		
+		-- play dash sound (if there is a dash sound assigned)
+		self:playAudioOneShot(self.sfx_dashSound)
+
+		-- set dash duration
+		self.remainingDashDuration = self.dashDurationConfig
+
+		-- trigger animation
+		self:playDashAttackAnimation()
+
+		-- disable further dashing
+		self.canDash = false
+
+		-- stop any remaining momentum from previous dash
+		self.continueVelocity = false
+
+		-- get array of Actors that could potentially be hit
+		self:getActorsInRange()
+
+		-- record player's balance value 
+		self.playerBalanceRecord = Player.actor.balance
+
+		-- Turn off effects while weapon is on cooldown
+		self:toggleEffects(false)
+		
+		-- If change in direction mid-dash is disabled, take a record of the dash start direction
+		self.initialDashDirection = self:setInitialDashDirection()
+
+		-- enable damage reduction
+		self.canReduceDamage = true
+
+	end
+end
+
+function dashScript:endDash()	
+	-- stop any current dashing
+	self.remainingDashDuration = 0
+	
+	-- set cooldown
+	self.remainingDashCooldown = self.dashCooldownConfig
+
+	-- start delayed remove damage reduction
+	self.script.StartCoroutine("delayedDamageReductionEnd")
+end
+
+function dashScript:updateMovement()
+	local direction = self:getDashDirection()
+
+	-- Vertical Movement
+	direction.y = direction.y * self.verticalMultiplier
+
+	-- Move Player!
+	Player.MoveActor(direction * self.dashSpeed * Time.fixedDeltaTime)
+end
+
+function dashScript:getDashDirection()
+	if self.allowChangeinDirection then 
+		return self.transform.TransformDirection(self.initialDashDirection.worldSpace) -- the rotation of the dash is relative to the rotation of the player (since the rotation of the dash is being overwritten every frame)
+	else
+		return self.initialDashDirection.localSpace -- the rotation of the dash is relative to the initial position & rotation of the dash (it stays the same througout)
+	end
+end
+
+function dashScript:setInitialDashDirection()
+
+	-- getDashDirection should not receive keyboard inputs after the initial input (being able to use wasd to change direction mid-dash felt janky)
+
+	local horizontalAxis = Input.GetAxisRaw("Horizontal")
+	local verticalAxis = Input.GetAxisRaw("Vertical")
+
+	if (horizontalAxis == 0 and verticalAxis == 0) or self.onlyDashForwards then -- if no wasd input or onlyDashForwards is true..
+		return {["worldSpace"] = self.transform.InverseTransformDirection(self.transform.forward), ["localSpace"] = self.transform.forward}
+	end
+	
+	local normalisedVector = Vector3(horizontalAxis, 0, verticalAxis).normalized
+
+	return {["worldSpace"] = normalisedVector, ["localSpace"] = self.transform.TransformDirection(normalisedVector)}
+end
+
+function dashScript:resetCooldown()
+	self.remainingDashCooldown = 0
+end
+
+function dashScript:updateDashDuration()
+	self.remainingDashDuration = self.remainingDashDuration - Time.fixedDeltaTime
+
+	if self.remainingDashDuration <= 0 then
+
+		-- if dash has completed..
+		self.continueVelocity = true
+		self.dashEndVelocity = Player.actor.velocity
+		self:endDash()	
+	end
+end
+
+function dashScript:updateDashCooldown()
+	self.remainingDashCooldown = self.remainingDashCooldown - Time.fixedDeltaTime
+	
+	-- if cooldown has reset..
+	if self.remainingDashCooldown <= 0 then
+
+		-- if dash was on cooldown, play cooldown finish audio cue
+		if (self.canDash ~= true) then
+			self:playAudioOneShot(self.sfx_cooldownCue)
+		end
+
+		-- enable cooldown indicator effects
+		self:toggleEffects(true)
+		
+		-- stop cooldown and allow dashing
+		self.remainingDashCooldown = -1
+		self.canDash = true
+
+	end
+end
+
+function dashScript:updateVelocity() 
+	-- ### This function is borrowed from a section of code shared by EaglePancake, all credit for momentum shananigans goes to him. ### 
+
+	local _momentumDecay = self.momentumDecay
+	if Player.actorIsGrounded then 
+		_momentumDecay = _momentumDecay * self.groundMomentumDecay
+	end
+	self.dashEndVelocity = Vector3.MoveTowards(self.dashEndVelocity, Vector3.zero, _momentumDecay)
+	Player.MoveActor(self.dashEndVelocity * Time.fixedDeltaTime)
+
+	if self.dashEndVelocity.magnitude == 0.001 or Player.actor.velocity.magnitude == 0.001 or Player.actor.velocity == Vector3.zero or Player.actor.isParachuteDeployed then
+		self.continueVelocity = false
+	end
+
+	-- ### End of borrowed code ###
+end
+
+function dashScript:activateHitbox()
+	local hitArray = nil
+	if self.hitboxPosition ~= nil then
+		hitArray = Physics.OverlapSphere(self.hitboxPosition.transform.position, self.dashHitboxSize, RaycastTarget.ProjectileHit)
+	else
+		hitArray = Physics.OverlapSphere(self.transform.position, self.dashHitboxSize, RaycastTarget.ProjectileHit)
+	end
+	if hitArray ~= nil then
+		for i = 1, #hitArray, 1 do
+			
+			-- if the element within hitArray is an Actor.. 
+			if hitArray[i].transform.gameObject.GetComponentInParent(Actor) ~= nil then
+				local otherActor = hitArray[i].transform.gameObject.GetComponentInParent(Actor)
+				-- check to see if they can be hit
+				self:dashAttackCheck(otherActor)
+			end
+		end
+	end
+end
+
+function dashScript:dashAttackCheck(_otherActor) -- Check whether the Actor should take damage
+	if Player.actor ~= _otherActor and self.actorsArray ~= nil and self:findIndexInTable(self.actorsArray, _otherActor) ~= nil then -- if actor is not the player actor and hasn't been hit this dash
+		if not(self.dontDamageTeammates and Player.actor.team == _otherActor.team) then -- don't damage teammates, if enabled in config
+		-- If eligible, damage the actor
+		self:dashAttack(_otherActor)
+		
+		-- Remove hit Actor from the list of Actors that can be damaged (prevents hitting the same Actor throughout every frame of the dash)
+		table.remove(self.actorsArray, self:findIndexInTable(self.actorsArray, _otherActor))
+		end
+	end
+end
+
+function dashScript:dashAttack(_otherActor)
+	local hitDirection
+		
+	-- HIT DIRECTION --
+	-- Option 1: Direction between player and otherActor positions (Better for pushing Actors away in all directions outwards from the player)
+	-- hitDirection = (otherActor.transform.position - Player.actor.transform.position).normalized 
+	
+	-- Option 2: Direction the player camera is facing (Better for pushing Actors in the direction of the dash)
+	hitDirection = (self.transform.forward + Vector3(0, self.dashVerticalKnockbackForce, 0))
+
+	Debug.DrawRay(Player.actor.transform.position + Vector3(0, 0.5, 0), hitDirection, Color.green, 5) -- Use to visualise hit direction
+
+	-- Damage otherActor
+	_otherActor.Damage(Player.actor, self.dashDmg, self.dashBalanceDmg, false, false, _otherActor.transform.position, hitDirection, hitDirection * self.dashKnockbackForce)	
+
+	-- play hitsound
+	self:playAudioOneShot(self.sfx_hitSound)
+
+end
+
+function dashScript:playAudioOneShot(_audioClip) 
+	if (_audioClip ~= nil and self.audioSrc ~= nil) then
+		self.audioSrc.PlayOneShot(_audioClip)
+	end
+end
+
+function dashScript:playDashAttackAnimation()
+	if (self.weapon.animator ~= nil) then
+		self.weapon.animator.SetTrigger("dashAttack")
+	end
+end
+
+function dashScript:getActorsInRange()
+
+	-- Get all Actors that could possibly be hit by the dash. Check radius is the maximum dash distance, with an extra 50 meters added. 
+	-- (The extra is to accomodate for enemies moving into the damage range mid-dash)
+	self.actorsArray = ActorManager.AliveActorsInRange(self.transform.position, self.dashDistance + 50)
+
+end
+
+function dashScript:delayedDamageReductionEnd()
+	coroutine.yield(WaitForSeconds(self.damageReductionExtraDuration))
+	self.canReduceDamage = false
+end
+
+function dashScript:toggleEffects(_bool)
+	if self.vfx_dashCharged ~= nil then
+		self.vfx_dashCharged.SetActive(_bool)
+	end
+end
+
+function dashScript:findIndexInTable(table, target)
+	for i = 1, #table, 1 do
+		if table[i] == target then
+			return i
+		end
+	end
+	-- print("findTableIndex >> could not find target")
+	return nil
+end
+
+function dashScript:getDashSpeed(duration, distance )
+	return (distance / (duration * distance)) * distance
+	-- e.g. "distance = 12", "duration = 0.3" will have an approx speed of 40 m/s (technically 39.99999..)
+end
+
+function dashScript:truncate(int, decimalPlace)
+	decimalPlace = decimalPlace or 2
+	return math.floor(int * 10^decimalPlace) / 10^decimalPlace
+end
+
+function dashScript:thirdPersonToggleCheck()
+	
+	if(Input.getKeyDown(KeyCode.Backslash)) then
+		if (PlayerCamera.activeCamera == PlayerCamera.tpCamera) then
+			PlayerCamera.FirstPersonCamera()
+		elseif (PlayerCamera.activeCamera == PlayerCamera.fpCamera) then
+			PlayerCamera.ThirdPersonCamera()
+		end
+		-- Third Person Camera
+		-- FP Camera
+	end
+end
