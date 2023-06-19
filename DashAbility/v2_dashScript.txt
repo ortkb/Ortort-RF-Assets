@@ -47,7 +47,7 @@ function dashScript:Start()
 	self.cooldownResetOnKill = self.dataContainer.GetBool("Cooldown Reset on Kill")
 	self.damageReductionWhileDashing = self.dataContainer.GetInt("Damage Reduction % while Dashing")
 	self.damageReductionExtraDuration = self.dataContainer.GetFloat("Dmg Reduction Extra Duration")
-	self.allowChangeinDirection = self.dataContainer.GetBool("Allow turning mid-dash?")
+	self.allowChangeinDirection = self.dataContainer.GetBool("Enable turning mid-dash?")
 	self.onlyDashForwards = self.dataContainer.GetBool("Only Dash forwards?")
 
 	-----
